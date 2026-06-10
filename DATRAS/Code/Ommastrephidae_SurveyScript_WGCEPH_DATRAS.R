@@ -12,7 +12,7 @@ require(surveyIndex)
 #Set location (of MasterTable, ICES data, and output folder)
 setwd("")
 
-outPath <- "Output/Survey Indices/"
+outPath <- "Results/"
 
 #Read in master table
 MasterTable <- read_xlsx("MasterTable.xlsx")
@@ -292,7 +292,7 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
             axis.title=element_text(face="bold"),
             axis.text=element_text(colour="black"))
     
-    ggsave(paste0(outPath, Group,"_",area,"_Survey-Numbers.png"), width = 3000, height = 1500, units = "px")
+    ggsave(paste0(outPath, Group,"/",Group,"_",area,"_Survey-Numbers.png"), width = 3000, height = 1500, units = "px")
     
     # Calculate mean of 3-year period and compare to previous 3-year period
     Survey_index_mean <- Survey_index %>%
@@ -329,7 +329,7 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
             axis.title=element_text(face="bold"),
             axis.text=element_text(colour="black"))
     
-    ggsave(paste0(outPath, Group,"_",area,"_MeanNumbers_Period.png"), width = 2000, height = 1500, units = "px")
+    ggsave(paste0(outPath, Group,"/",Group,"_",area,"_MeanNumbers_Period.png"), width = 2000, height = 1500, units = "px")
     
     #Store trend results
     TrendTable_area <-  Survey_index_mean %>%
@@ -361,7 +361,7 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
             axis.title=element_text(face="bold"),
             axis.text=element_text(colour="black"))
     
-    ggsave(paste0(outPath, Group,"_",area,"_Survey-Biomass.png"), width = 3000, height = 1500, units = "px")
+    ggsave(paste0(outPath, Group,"/",Group,"_",area,"_Survey-Biomass.png"), width = 3000, height = 1500, units = "px")
     
     # Calculate mean of 3-year period and compare to previous 3-year period
     Survey_index_mean <- Survey_index %>%
@@ -398,7 +398,7 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
             axis.title=element_text(face="bold"),
             axis.text=element_text(colour="black"))
     
-    ggsave(paste0(outPath, Group,"_",area,"_MeanBiomass_Period.png"), width = 2000, height = 1500, units = "px")
+    ggsave(paste0(outPath, Group,"/",Group,"_",area,"_MeanBiomass_Period.png"), width = 2000, height = 1500, units = "px")
     
     # Bind together all indices and overall trends
     Survey_index$Region <- area
@@ -408,5 +408,5 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
 }}
 
 # Save index data
-write.csv(IndexDat, file = paste0(outPath,Group, "_IndexData.csv"))
-write_xlsx(TrendTable, path = paste0(outPath,Group, "_TrendTable.xlsx"))
+write.csv(IndexDat, file = paste0(outPath, Group,"/",Group, "_IndexData.csv"))
+write_xlsx(TrendTable, path = paste0(outPath, Group,"/",Group, "_TrendTable.xlsx"))
