@@ -11,7 +11,7 @@ require(RColorBrewer)
 require(surveyIndex)
 
 #Set location (of MasterTable, ICES data, and output folder)
-setwd("C:/Users/pol057/OneDrive - Wageningen University & Research/Git/Lab/wg_WGCEPH/DATRAS/")
+setwd("OneDrive/Git/Lab/wg_WGCEPH/DATRAS/")
 
 outPath <- "Results/"
 
@@ -22,7 +22,7 @@ MasterTable <- read_xlsx("MasterTable.xlsx")
 year <- 2026
 
 # Select group and species (Aphia ID)
-Group <- "Loliginidae"
+Group <- "Octopodidae"
 
 sp        <- unique(MasterTable$Species[MasterTable$Family == Group])
 # Get aphia IDs
@@ -507,7 +507,9 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
         xlab(NULL) + ylab(NULL) +
         ggtitle(survey) +
         facet_grid(SpeciesName ~ Year)      +
-        theme(plot.title = element_text(hjust = 0.5))
+        theme(plot.title = element_text(hjust = 0.5),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank())
       
       # Save
       ggsave(Surv_map_plot ,filename = paste0(outPath, Group,"/",Group,"_",area,"_",survey,"_Map.png"), units = "px", width = 3000, height = 3000)

@@ -11,7 +11,7 @@ require(RColorBrewer)
 require(surveyIndex)
 
 #Set location (of MasterTable, ICES data, and output folder)
-setwd("W:/IMARES/DATA/ICES-WG/WGCEPH/2026/")
+setwd("OneDrive/Git/Lab/wg_WGCEPH/DATRAS/")
 
 outPath <- "Results/"
 
@@ -507,7 +507,9 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
         xlab(NULL) + ylab(NULL) +
         ggtitle(survey) +
         facet_grid(SpeciesName ~ Year)      +
-        theme(plot.title = element_text(hjust = 0.5))
+        theme(plot.title = element_text(hjust = 0.5),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank())
       
       # Save
       ggsave(Surv_map_plot ,filename = paste0(outPath, Group,"/",Group,"_",area,"_",survey,"_Map.png"), units = "px", width = 3000, height = 3000)
