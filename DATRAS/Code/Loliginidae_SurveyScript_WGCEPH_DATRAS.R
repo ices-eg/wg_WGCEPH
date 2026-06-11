@@ -11,7 +11,7 @@ require(RColorBrewer)
 require(surveyIndex)
 
 #Set location (of MasterTable, ICES data, and output folder)
-setwd("")
+setwd("W:/IMARES/DATA/ICES-WG/WGCEPH/2026/")
 
 outPath <- "Results/"
 
@@ -55,7 +55,7 @@ quarters  <- 1:4
 for(surv in surveys){
   # Survey data
   surv_dat <- DATRAS::getDatrasExchange(survey = surv, years = years, quarters = quarters)
-  
+
   # Bind surveys together into one DATRASraw file
   if(surv == surveys[1]){
     surv_list <- surv_dat
@@ -98,6 +98,11 @@ surv_list[["HH"]] <- surv_list[["HH"]] |>
 
 # If coordinates are still missing, remove these hauls
 surv_list <- subset(surv_list, !is.na(ShootLat))
+
+
+checkie <- surv_list[["HL"]]
+checkie <- checkie %>% filter(Valid_Aphia == 140601 & Year == 2025 & Survey == "SP-ARSA")
+nrow(checkie)
 
 # Spatial join to ICES areas
 sf_use_s2(FALSE)
@@ -151,7 +156,6 @@ surv_list <- subset(surv_list, Valid_Aphia %in% aphias_df$aphia)
 surv_list <- subset(surv_list, HaulVal == "V")
 
 # Save, read in next year and only extract the most recent year
-
 save(surv_list,file= paste0("SurveyData_",Group,"_00-26.RData"))
 load(file= paste0("SurveyData_",Group,"_00-26.RData"))
 
@@ -187,6 +191,18 @@ SurveyIdxCPUE <- function(hh){
   res$index_b_std <- res$index_b / mean(res$index_b, na.rm = TRUE)
   res
 }
+
+# Get map of Europe
+library(giscoR)
+eurPolsHires <- gisco_get_countries(
+  year = 2020,
+  resolution = "01",  # highest resolution
+  country = c("Norway", "Sweden", "Finland", "Denmark", "United Kingdom", "Ireland","Germany", "Netherlands", "Belgium",
+              "Luxembourg", "France", "Andorra", "Spain", "Portugal", "Marocco", "Switzerland")
+)
+eurPolsHires <- st_as_sf(eurPolsHires)
+st_crs(eurPolsHires) <- 4326
+
 
 IndexDat <- data.frame()
 TrendTable <- data.frame()
@@ -407,7 +423,98 @@ for(area in unique(MasterTable$Area[MasterTable$Family == Group])){
     IndexDat <- bind_rows(IndexDat, Survey_index)
     
     TrendTable <- bind_rows(TrendTable, TrendTable_area)
-}}
+    
+    # Plot maps 
+    SurveyNames      <- unique(unlist(strsplit(MasterTable$SurveyGroups[MasterTable$Area == area], ",")))
+    # Loop over surveys
+    for(survey in SurveyNames){
+      hh_all <- data.frame()
+      divisions    <- unique(unlist(strsplit(MasterTable$Divisions[MasterTable$Area == area], ",")))
+      
+      surv_dat  <- subset(surv_list, SurveyName == survey & Area %in% divisions)
+      
+      if(nrow(surv_dat[["HL"]]) > 0){
+        for(aph in unique(surv_dat[["HL"]]$Valid_Aphia)){
+          surv_sp_dat <- subset(surv_dat, Valid_Aphia == aph)
+        
+          if(nrow(surv_sp_dat[["HL"]]) > 0){
+            # Calculate total numbers and weight per haul
+            # Use HL table directly
+            hl <- surv_sp_dat[["HL"]]
+            
+            # Keep unique hauls, if multiple total numbers found, we assume they are separate observations (e.g. male and female) and can be summed
+            hl_unique <- hl %>%
+              group_by(haul.id) %>%
+              summarise(TotalNo = if (n_distinct(TotalNo) > 1) {
+                sum(TotalNo, na.rm = TRUE)
+              } else {first(TotalNo)},
+              CatCatchWgt = if (n_distinct(CatCatchWgt) > 1) {
+                sum(CatCatchWgt, na.rm = TRUE)
+              } else {first(CatCatchWgt)},
+              across(-c(TotalNo, CatCatchWgt), first),.groups = "drop")
+            
+            # Merge into HH (because we also want hauls with 0 observations)
+            hh <- surv_sp_dat[["HH"]]
+            
+            # Keep only haul ID + cpue
+            cat_dat <- hl_unique[, c("haul.id",  "Valid_Aphia", "TotalNo", "CatCatchWgt")]
+            
+            # Merge into HH
+            hh <- merge(hh, cat_dat, by = "haul.id", all.x = TRUE)
+            
+            # Zero catches become NA after merge -> set to 0
+            hh$TotalNo[is.na(hh$TotalNo)] <- 0  
+            hh$CatCatchWgt[is.na(hh$CatCatchWgt)] <- 0  
+            hh$Valid_Aphia[is.na(hh$Valid_Aphia)] <- aph  
+            
+            #Add species name      
+            hh <- hh %>% left_join(aphias_df, by = c("Valid_Aphia" = "aphia"))
+  
+            
+          }
+          hh_all <- bind_rows(hh_all, hh)  
+        }
+      
+      # Add species name
+      
+      # Transform to shapefile
+      hh_sf <- st_as_sf(hh_all, coords = c("ShootLong", "ShootLat"), crs = 4326) %>%
+        mutate(Zero = ifelse(TotalNo == 0, "Zero", "Not Zero"))
+      
+      hh_sf$FillGroup <- ifelse(hh_sf$Zero == "Zero", "Zero", hh_sf$Country)
+      hh_sf$PointSize <- ifelse(hh_sf$Zero == "Zero", 1, hh_sf$TotalNo)
+      
+      # Get final 6 years and create bounding box
+      YearRange <- c(max(as.numeric(as.character(hh_sf$Year)))-5):max(as.numeric(as.character(hh_sf$Year)))
+      
+      # Get ICES divisions
+      ICES_areas_plot <- ICES_areas %>% mutate(DivName = paste(SubArea, Division, sep = ".")) %>%
+        filter(DivName %in% divisions)
+      
+      bb <- sf::st_bbox(ICES_areas_plot)
+      
+      # Plot
+      Surv_map_plot <- ggplot() +
+        geom_sf(data = ICES_areas_plot, fill = NA, color = "grey") +
+        geom_sf(data = subset(hh_sf, Year %in% YearRange & Zero == "Zero"),shape = 4,size = 1,colour = "lightgrey",alpha = 0.3) +
+        geom_sf(data = subset(hh_sf, Year %in% YearRange & Zero != "Zero"),aes(size = log(TotalNo), fill = Country, colour = Country),shape = 21,alpha = 0.5) + 
+        scale_size(range = c(0.2, 3))+
+        geom_sf(data = eurPolsHires, fill = "light grey") +
+        theme_bw() +
+        coord_sf(xlim = c(bb["xmin"], bb["xmax"]),ylim = c(bb["ymin"], bb["ymax"]),expand = TRUE) +
+        scale_x_continuous(breaks = pretty(c(bb["xmin"], bb["xmax"]), n = 4)) +
+        scale_y_continuous(breaks = pretty(c(bb["ymin"], bb["ymax"]), n = 4))+
+        xlab(NULL) + ylab(NULL) +
+        ggtitle(survey) +
+        facet_grid(SpeciesName ~ Year)      +
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      # Save
+      ggsave(Surv_map_plot ,filename = paste0(outPath, Group,"/",Group,"_",area,"_",survey,"_Map.png"), units = "px", width = 3000, height = 3000)
+      }
+      }
+  }
+  }
 
 # Save index data
 write.csv(IndexDat, file = paste0(outPath, Group,"/",Group, "_IndexData.csv"))
